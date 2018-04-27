@@ -19,10 +19,11 @@ tasks:
     extra:
       github:
         events:
-          - pull_request.opened
-          - pull_request.edited
-          - pull_request.synchronize
-          - pull_request.reopened
+          #- pull_request.opened
+          #- pull_request.edited
+          #- pull_request.synchronize
+          #- pull_request.reopened
+          - release
     payload:
       maxRunTime: 3600
       deadline: "{{ '2 hours' | $fromNow }}"
@@ -111,16 +112,20 @@ tasks:
         env: true
         events:
           - release
+          - pull_request.opened
+          - pull_request.edited
+          - pull_request.synchronize
+          - pull_request.reopened
     scopes:
       - "queue:create-task:aws-provisioner-v1/github-worker"
-      - "queue:create-task:highest:aws-provisioner-v1/gecko-focus"
-      - "queue:create-task:highest:scriptworker-prov-v1/mobile-signing-v1"
-      - "queue:create-task:highest:scriptworker-prov-v1/mobile-pushapk-v1"
+      - "queue:create-task:lowest:aws-provisioner-v1/gecko-focus"
+      - "queue:create-task:lowest:scriptworker-prov-v1/mobile-signing-v1"
+      - "queue:create-task:lowest:scriptworker-prov-v1/mobile-pushapk-v1"
       - "queue:scheduler-id:taskcluster-github"
       - "project:mobile:focus:releng:signing:cert:release-signing"
       - "project:mobile:focus:releng:signing:format:focus-jar"
       - "project:mobile:focus:releng:googleplay:product:focus"
-      - "secrets:get:project/focus/tokens"
+#      - "secrets:get:project/focus/tokens"
     payload:
       maxRunTime: 3600
       deadline: "{{ '2 hours' | $fromNow }}"
@@ -130,10 +135,19 @@ tasks:
         - '--login'
         - '-cx'
         - >-
-          git fetch origin --tags
+          git fetch {{ event.head.repo.url }} {{ event.head.repo.branch }}
           && git config advice.detachedHead false
-          && git checkout {{ event.version }}
-          && python tools/taskcluster/release.py --track alpha --commit --tag {{ event.version }}
+          && git checkout {{event.head.sha}}
+          && python tools/taskcluster/release.py \
+            --track alpha \
+            --commit \
+            --output /opt/focus-android/app/build/outputs/apk \
+            --apk focusWebviewUniversal/release/app-focus-webview-universal-release-unsigned.apk \
+            --apk klarGeckoArm/release/app-klar-gecko-arm-release-unsigned.apk \
+            --apk klarGeckoX86/release/app-klar-gecko-x86-release-unsigned.apk
+#          git fetch origin --tags
+#          && git config advice.detachedHead false
+#          && git checkout {{ event.version }}
       features:
         taskclusterProxy: true
         chainOfTrust: true
